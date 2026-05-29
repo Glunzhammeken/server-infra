@@ -27,8 +27,13 @@ else
 fi
 
 if [[ ! -f inventories/opgavehelten/hosts.yml ]]; then
-    err "inventories/opgavehelten/hosts.yml mangler."
-    fail=1
+    if [[ -f inventories/opgavehelten/hosts.yml.example ]]; then
+        cp inventories/opgavehelten/hosts.yml.example inventories/opgavehelten/hosts.yml
+        ok "Inventory oprettet fra example"
+    else
+        err "inventories/opgavehelten/hosts.yml mangler og ingen example-fil fundet."
+        fail=1
+    fi
 else
     ok "Inventory fundet"
 fi
