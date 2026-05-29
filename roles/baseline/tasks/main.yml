@@ -1,0 +1,117 @@
+---
+- name: Installér baseline-pakker (ufw, fail2ban)
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - fail2ban
+    state: present
+    update_cache: true
+
+- name: Opgradér alle pakker
+  ansible.builtin.apt:
+    upgrade: dist
+
+- name: Check om reboot er nødvendigt
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required_file
+
+- name: Stop og bed om manuel reboot hvis kernen er opdateret
+  ansible.builtin.fail:
+    msg: >
+      En pakkeopgradering kræver reboot (/var/run/reboot-required findes).
+      Da stakken kører på én maskine, kan playbooken ikke genstarte sig selv
+      midt i kørslen. Kør 'reboot' manuelt, log ind igen, og kør
+      'ansible-playbook site.yml' forfra. Anden gang er der ingen
+      kerneopdatering, så denne task springes over og playbooken fortsætter.
+  when: reboot_required_file.stat.exists
+
+- name: Tillad SSH port 22
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Aktivér UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Sørg for at runtime-mappen til sshd findes
+  ansible.builtin.file:
+    path: /run/sshd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deaktivér password login
+  ansible.builtin.copy:
+    content: "PasswordAuthentication no\n"
+    dest: /etc/ssh/sshd_config.d/01-no-password.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Genstart SSH
+
+- name: Stop ssh.socket så socket activation ikke overstyrer (Ubuntu 24.04)
+  ansible.builtin.systemd_service:
+    name: ssh.socket
+    state: stopped
+    enabled: false
+
+- name: Sørg for at ssh.service kører og starter ved boot
+  ansible.builtin.systemd_service:
+    name: ssh.service
+    state: started
+    enabled: true
+
+- name: Aktivér SSH-ændringer nu før verifikation
+  ansible.builtin.meta: flush_handlers
+
+- name: Læg fail2ban jail.local ud fra skabelon
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Genstart fail2ban
+
+- name: Sørg for at fail2ban er startet og aktiveret ved boot
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Hent faktisk SSH-konfiguration (sandheden fra sshd selv)
+  ansible.builtin.command: sshd -T
+  register: sshd_effective_config
+  changed_when: false
+
+- name: Bekræft at password-login og keyboard-interactive er slået fra
+  ansible.builtin.assert:
+    that:
+      - "'passwordauthentication no' in sshd_effective_config.stdout"
+      - "'kbdinteractiveauthentication no' in sshd_effective_config.stdout"
+    success_msg: "SSH er hærdet: password- og keyboard-interactive-login er deaktiveret."
+    fail_msg: "ADVARSEL: sshd tillader stadig password-login. Hærdningen virkede ikke."
+
+- name: Hent UFW-status
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status_check
+  changed_when: false
+
+- name: Bekræft at UFW er aktiv
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in ufw_status_check.stdout"
+    success_msg: "UFW er aktiv."
+    fail_msg: "ADVARSEL: UFW er ikke aktiv."
+
+- name: Bekræft at fail2ban-servicen kører
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    state: started
+  register: fail2ban_running
+  check_mode: true
+  changed_when: false

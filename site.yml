@@ -1,0 +1,12 @@
+---
+# Infrastruktur-playbook — baseline, hardening og Docker
+#
+# Kørsel: ansible-playbook site.yml
+
+- name: Fase 1 — infrastruktur
+  hosts: server
+  become: true
+  roles:
+    - baseline
+    - hardening
+    - docker
