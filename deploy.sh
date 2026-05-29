@@ -46,7 +46,7 @@ fi
 
 sep
 echo ""
-ansible-galaxy collection install -r requirements.yml --upgrade -q
+ansible-galaxy collection install -r requirements.yml --upgrade
 ansible-playbook site.yml
 echo ""
 sep
