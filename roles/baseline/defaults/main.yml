@@ -4,9 +4,4 @@ fail2ban_findtime: 10m
 fail2ban_maxretry: 5
 
 ufw_rules:
-  - { port: "22",   proto: tcp }
-  - { port: "80",   proto: tcp }
-  - { port: "443",  proto: tcp }
-  - { port: "3478", proto: tcp }
-  - { port: "3478", proto: udp }
-  - { port: "8443", proto: tcp }
+  - { port: "22", proto: tcp }

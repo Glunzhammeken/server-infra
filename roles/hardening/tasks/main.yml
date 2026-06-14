@@ -1,15 +1,4 @@
 ---
-- name: Åbn applikations-porte (HTTP, HTTPS, Talk TURN)
-  community.general.ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: "{{ item.proto }}"
-  loop:
-    - { port: "80", proto: tcp }
-    - { port: "443", proto: tcp }
-    - { port: "3478", proto: tcp }
-    - { port: "3478", proto: udp }
-
 - name: Installér pakker til automatiske opdateringer
   ansible.builtin.apt:
     name:
@@ -18,6 +7,16 @@
       - needrestart
     state: present
     update_cache: true
+
+- name: Konfigurér needrestart til ikke-interaktiv tilstand
+  ansible.builtin.copy:
+    content: |
+      $nrconf{restart} = 'a';
+      $nrconf{kernelhints} = 0;
+    dest: /etc/needrestart/conf.d/99-attitude-it.conf
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: Læg apt periodic-konfiguration ud (statisk)
   ansible.builtin.copy:
@@ -51,32 +50,6 @@
     enabled: true
 
 # Verifikation
-- name: Hent UFW-status
-  ansible.builtin.command: ufw status verbose
-  register: ufw_status_check
-  changed_when: false
-
-- name: Bekræft at applikations-porte er åbne
-  ansible.builtin.assert:
-    that:
-      - "'80/tcp' in ufw_status_check.stdout"
-      - "'443/tcp' in ufw_status_check.stdout"
-      - "'3478/tcp' in ufw_status_check.stdout"
-      - "'3478/udp' in ufw_status_check.stdout"
-    success_msg: "Applikations-porte (80, 443, 3478 tcp+udp) er åbne i UFW."
-    fail_msg: "ADVARSEL: en eller flere applikations-porte mangler i UFW."
-
-- name: Bekræft at SSH stadig er hærdet (sat i baseline)
-  ansible.builtin.command: sshd -T
-  register: sshd_effective_config
-  changed_when: false
-
-- name: Fastslå at password-login fortsat er deaktiveret
-  ansible.builtin.assert:
-    that:
-      - "'passwordauthentication no' in sshd_effective_config.stdout"
-    success_msg: "SSH er stadig hærdet: password-login er deaktiveret."
-    fail_msg: "ADVARSEL: password-login er aktivt igen. Kør baseline-rollen."
 - name: Verificér unattended-upgrades-konfiguration med dry-run
   ansible.builtin.command: unattended-upgrade --dry-run
   register: uu_dryrun

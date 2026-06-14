@@ -15,3 +15,13 @@ mailcow_timezone: "Europe/Copenhagen"
 # Sæt true under test for at undgå Let's Encrypts rate limits.
 # HUSK at sætte den tilbage til false inden produktion.
 nginx_certbot_staging: false
+
+# Applikationsspecifikke UFW-porte (tilføjes oven på baseline's port 22).
+# Tilpas listen til kundens faktiske stack.
+ufw_rules:
+  - { port: "22",   proto: tcp }
+  - { port: "80",   proto: tcp }
+  - { port: "443",  proto: tcp }
+  - { port: "3478", proto: tcp }
+  - { port: "3478", proto: udp }
+  - { port: "8443", proto: tcp }
